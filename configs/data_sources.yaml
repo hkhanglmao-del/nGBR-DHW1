@@ -1,0 +1,41 @@
+# Data-source manifest for extending the local NOAA CRW sample.
+# Put downloaded files under data/external/ and either merge them as CSV tables
+# or declare gridded NetCDF sources here. The pipeline keeps these sources
+# optional so the repository can run with the existing CRW NetCDF only.
+
+noaa_crw_5km:
+  description: Daily 5 km coral bleaching heat-stress products.
+  url: https://coastwatch.pfeg.noaa.gov/erddap/info/NOAA_DHW/index.html
+  variables:
+    - CRW_SST
+    - CRW_SSTANOMALY
+    - CRW_HOTSPOT
+    - CRW_DHW
+    - CRW_BAA
+    - CRW_BAA_7D_MAX
+
+nasa_oceancolor_modis:
+  description: MODIS Aqua Level 3 mapped chlorophyll-a and PAR.
+  url: https://oceandata.sci.gsfc.nasa.gov/l3/
+  variables:
+    - chlorophyll_a
+    - par
+  suggested_resolution: daily or 8-day mapped products
+
+copernicus_global_physics_reanalysis:
+  description: GLORYS global ocean reanalysis for salinity and currents.
+  url: https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/description
+  variables:
+    - salinity
+    - current_u
+    - current_v
+  suggested_depth: surface or shallowest model level
+
+noaa_cpc_enso:
+  description: ONI or MEI ENSO index, joined monthly and forward-filled/interpolated to daily.
+  urls:
+    - https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ONI_v5.php
+    - https://psl.noaa.gov/enso/mei/
+  variables:
+    - enso_index
+

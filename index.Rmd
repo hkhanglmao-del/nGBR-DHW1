@@ -1,0 +1,393 @@
+---
+title: "Analysis of the 2024 mass bleaching event at Lizard Island (northern GBR) via NOAA Coral Reef Watch (CRW) satellite data"
+author: "George Roff"
+date: "2024-07-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Reproducible workflow and analysis for calculation of thermal stress and Degree Heating Weeks based on the NOAA CRW data in `R`.
+
+#### 1. Extract NOAA DHW data
+
+Extract DHW data from NOAA for gridcells surround Lizard Island between 1997 - present
+
+```{r, eval=FALSE}
+library(tidyverse)
+library(rerddap)
+library(sf)
+
+# north_point -14.645754, 145.454105
+# palfrey -14.700424, 145.448641
+
+north_point_sf <- st_sf(geometry = st_sfc(st_point(c(145.454105, -14.645754)), crs = 4326))
+palfrey_se_sf <- st_sf(geometry = st_sfc(st_point(c(145.448641, -14.700424)), crs = 4326))
+
+northpoint_latitude <- c(-14.645754, -14.700424)
+northpoint_longitude <- c(145.454105, 145.448641)
+northpoint_timeseries <- c("1997-01-01", "2024-07-01")
+
+NOAA_DHW_params <- info('NOAA_DHW')
+
+
+northpointDHW <- griddap(NOAA_DHW_params, 
+                         latitude = northpoint_latitude,
+                         longitude = northpoint_longitude,
+                         time = northpoint_timeseries,
+                         fields = c("CRW_SST", "CRW_SSTANOMALY", "CRW_HOTSPOT", "CRW_DHW", "CRW_BAA")
+                         )
+
+saveRDS(northpointDHW, "/Users/rof011/northpointDHW.Rds")
+
+
+#https://coastwatch.pfeg.noaa.gov/erddap/griddap/NOAA_DHW.nc?CRW_BAA%5B(2017-01-01T12:00:00Z):1:(2024-07-01T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_BAA_7D_MAX%5B(2017-01-01T12:00:00Z):1:(2024-07-01T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_DHW%5B(2017-01-01T12:00:00Z):1:(2024-07-01T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_HOTSPOT%5B(2017-01-01T12:00:00Z):1:(2024-07-01T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_SST%5B(2017-01-01T12:00:00Z):1:(2024-07-01T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_SSTANOMALY%5B(2017-01-01T12:00:00Z):1:(2024-07-01T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D
+
+#https://coastwatch.pfeg.noaa.gov/erddap/griddap/NOAA_DHW.nc?CRW_BAA%5B(2010-01-01T12:00:00Z):1:(2025-02-08T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_BAA_7D_MAX%5B(2010-01-01T12:00:00Z):1:(2025-02-08T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_DHW%5B(2010-01-01T12:00:00Z):1:(2025-02-08T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_HOTSPOT%5B(2010-01-01T12:00:00Z):1:(2025-02-08T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_SST%5B(2010-01-01T12:00:00Z):1:(2025-02-08T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D,CRW_SSTANOMALY%5B(2010-01-01T12:00:00Z):1:(2025-02-08T12:00:00Z)%5D%5B(-14.645754):1:(-14.700424)%5D%5B(145.448641):1:(145.454105)%5D
+
+
+```
+
+```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+
+
+library(tidyverse)
+library(janitor)
+library(dhw)
+library(sf)
+library(ggplot2)
+library(terra)
+library(tidyterra)
+library(rlang)
+
+north_point_sf <- st_sf(geometry = st_sfc(st_point(c(145.454105, -14.645754)), crs = 4326))
+palfrey_se_sf <- st_sf(geometry = st_sfc(st_point(c(145.448641, -14.700424)), crs = 4326))
+
+northpoint_latitude <- c(-14.645754, -14.700424)
+northpoint_longitude <- c(145.454105, 145.448641)
+northpoint_timeseries <- c("1997-01-01", "2024-07-01")
+
+```
+
+#### 2) Extract Great Barrier Reef shp files
+
+Plot subset of DHW data to explore location of gridcells:
+
+
+```{r, fig.width=5, fig.height=7, message=FALSE, warning=FALSE}
+
+
+
+
+#gbr_shapefile <- download_gbr_spatial(return = "base")
+gbr_shapefile <- st_read("data/zipfolder/Great_Barrier_Reef_Features.shp")  
+
+  
+
+# extract and tidy to sf
+lizard_shape <- gbr_shapefile |> 
+  filter(str_detect(GBR_NAME, "Lizard"))
+
+lizard_union <- st_union(lizard_shape)
+lizard_reefs <- st_sf(geometry = st_sfc(lizard_union), crs = st_crs(lizard_shape)) 
+lizard_islands <- lizard_reefs |> st_concave_hull(ratio=0.01)
+
+
+# read in SST
+northpointDHW<- rast("data/dhw_5km_3231_0c35_4219_U1739212814032.nc")
+
+filtered_northpointDHW <- northpointDHW["CRW_DHW"]#, varnames(northpointDHW)))
+
+# Filter layers between the specified dates
+filtered_northpointDHW <- filtered_northpointDHW[[which(
+   time(filtered_northpointDHW) >= as.Date("2024-03-10") &
+   time(filtered_northpointDHW) <= as.Date("2024-03-11")
+)]]
+
+
+
+ggplot() + theme_bw() +
+  geom_spatraster(data = filtered_northpointDHW) +
+  scale_fill_gradientn(colors = (RColorBrewer::brewer.pal(9, "Reds")), name="DHW", limits=c(4,8)) +
+  geom_sf(data=lizard_islands, color="black", fill="darkgreen") +
+  geom_sf(data=lizard_reefs, color="black", fill="beige") +
+  geom_sf(data=north_point_sf, shape=21, fill="turquoise", size=2) +
+  geom_sf_label(data=north_point_sf, fill="turquoise", label="North Point", nudge_y = 0.005, nudge_x = -0.005) +
+  geom_sf(data=palfrey_se_sf, shape=21, fill="aquamarine", size=2) +
+  geom_sf_label(data=palfrey_se_sf, fill="aquamarine", label="Palfrey SE", nudge_y = -0.005, nudge_x = -0.008) +
+  ggtitle("10th Feb 2025 (NOAA DHW)") + xlab("") + ylab("")
+
+
+```
+
+
+#### 3) Spatially average DHW data across gridcells
+
+
+Create `calculate_spatial_average` function that takes each raster input and computes the average DHW value for each timestep across the input data
+
+```{r, fig.width=8, fig.height=3, message=FALSE, warning=FALSE}
+
+
+# Function to compute spatial average for each layer
+calculate_spatial_average <- function(raster) {
+  time_layers <- unique(names(raster))
+  avg_values <- sapply(time_layers, function(layer) {
+    mean(values(raster[[layer]]), na.rm = TRUE)
+  })
+  return(avg_values)
+}
+
+# Split the SpatRaster object by parameter names
+baa_rast <- northpointDHW[[grep("CRW_BAA_", names(northpointDHW))]]
+baa_7d_max_rast <- northpointDHW[[grep("CRW_BAA_7D_MAX_", names(northpointDHW))]]
+dhw_rast <- northpointDHW[[grep("CRW_DHW_", names(northpointDHW))]]
+hotspot_rast <- northpointDHW[[grep("CRW_HOTSPOT_", names(northpointDHW))]]
+sst_rast <- northpointDHW[[grep("CRW_SST_", names(northpointDHW))]]
+sst_anomaly_rast <- northpointDHW[[grep("CRW_SSTANOMALY_", names(northpointDHW))]]
+
+
+
+# Calculate the spatial average for each timestep
+
+spatial_aggregate <- function(varname){
+  rast_output <- northpointDHW[[grep(varname, names(northpointDHW))]]
+  
+  outputdf <- terra::as.data.frame(rast_output, xy = TRUE, na.rm = FALSE, wide = FALSE, time=TRUE) %>%
+    rename(!!sym(varname) := values) %>%
+    select(-layer) %>%
+    group_by(time) %>%
+    summarise(!!sym(varname) := mean(!!sym(varname), na.rm = TRUE)) %>%
+    ungroup() 
+  
+  return(outputdf)
+}
+
+
+avg_baa <- spatial_aggregate("CRW_BAA_")
+avg_baa_7d_max <- spatial_aggregate("CRW_BAA_7D_MAX_")
+avg_dhw <- spatial_aggregate("CRW_DHW_")
+avg_hotspot <- spatial_aggregate("CRW_HOTSPOT_")
+avg_sst <- spatial_aggregate("CRW_SST_")
+avg_sst_anomaly <- spatial_aggregate("CRW_SSTANOMALY_")
+
+
+lizard_data <- left_join(avg_sst, avg_sst_anomaly) %>%
+  left_join(., avg_hotspot) %>%
+  left_join(., avg_dhw) %>%
+  left_join(., avg_baa) %>%
+  left_join(., avg_baa_7d_max) |> 
+  mutate(ymd = ymd(as.Date(time))) |> 
+  mutate(year = year(ymd)) |>
+  mutate(month = month(ymd)) |>
+  mutate(day = yday(ymd)) |>
+  group_by(year) |> 
+  mutate(maxdhw = max(CRW_DHW_))
+  
+timeseries_dhw <- ggplot() + theme_bw() +
+  geom_line(data=lizard_data, aes(x=ymd, y=CRW_DHW_)) +
+  ylim(0,10)
+
+timeseries_dhw
+
+```
+
+
+#### 3) Extract annual maximum DHW 
+
+Calculate the maximum DHW for each year 2010-2024
+
+```{r, fig.width=5, fig.height=3.5, message=FALSE, warning=FALSE}
+
+library(RColorBrewer)
+
+maxdhw <- lizard_data |> 
+  group_by(year) |> 
+  summarise(maxdhw=max(CRW_DHW_)) |> 
+ggplot() + theme_bw() +
+  scale_x_continuous(limits=c(2009, 2024.5), breaks=seq(2010, 2024,2)) +
+  geom_col(aes(x=year, y=maxdhw, fill=maxdhw), show.legend=FALSE, linewidth=0.25, color="black") +
+  ylim(0, 10) + ylab("Maximum annual DHW") +
+  scale_fill_gradient2(midpoint = 3, low = brewer.pal(9, "RdBu")[9], mid = brewer.pal(9, "RdBu")[5], high = brewer.pal(9, "RdBu")[1], limits = c(0, 10))
+
+maxdhw
+
+```
+
+
+##### 4) Extract DHW timeseries (2016, 2017, 2020, 2022, 2024) 
+
+Extract DHW timeseries for the last 5 bleaching events
+
+```{r, fig.width=8, fig.height=4}
+library(RColorBrewer)
+
+# Reference year for conversion (e.g., 2020, which is a leap year to handle all possible days)
+reference_year <- 2020
+
+timeseries_dhw <- lizard_data %>%
+  ungroup() %>%
+  group_by(year) %>% 
+  filter(year %in% c(2016, 2017, 2020, 2022, 2024)) %>%
+  # mutate(maxdhw=max(CRW_DHW_)) %>% 
+  # filter(maxdhw > 4) %>% 
+  mutate(reference_date = as.Date(day - 1, origin = paste0(reference_year, "-01-01"))) %>%
+  mutate(reference_date = if_else(month >= 11, reference_date - years(1), reference_date)) %>%
+  ggplot() + 
+  theme_bw() +
+  geom_line(aes(x = reference_date, y = CRW_DHW_, color = as.factor(year)), lwd=1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b", 
+               limits = as.Date(c(paste0(reference_year-1, "-11-19"), paste0(reference_year, "-8-31")))) +
+  labs(x = "Month", y = "CRW DHW") +
+  scale_color_manual(name = "Year", values =c("#D53E4F", "#F46D43", "yellow3", "#99D594", "#3288BD")) +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1.5)) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, 2)) +
+  ylab("Degree Heating Weeks") +
+  geom_vline(xintercept = as.Date("2020-01-01"), color="grey", linetype="dashed") +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend at the top right
+        legend.justification = c("right", "top"),
+        legend.background = element_rect(fill = "white", color = NA),
+        legend.box.background = element_blank(),  # Remove border around legend
+        legend.title = element_blank()) 
+
+timeseries_dhw
+
+```
+
+##### 5) Extract SST anomalies 2010-2024
+
+```{r, fig.width=8, fig.height=4}
+
+reference_year <- 2020
+
+lizard_anoms <- lizard_data %>%
+  ungroup() %>%
+  group_by(year) %>% 
+#  filter(year > 2014) %>%
+  filter(year < 2025) %>%
+  mutate(reference_date = as.Date(day - 1, origin = paste0(reference_year, "-01-01"))) %>%
+  mutate(reference_date = if_else(month >= 11, reference_date - years(1), reference_date)) %>%
+  ggplot() + 
+  theme_bw() +
+  geom_line(aes(x = reference_date, y = CRW_HOTSPOT_, color = as.factor(year)), lwd=1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b", 
+               limits = as.Date(c(paste0(reference_year-1, "-11-01"), paste0(reference_year, "-10-31")))) +
+  labs(x = "Month", y = "CRW SST") +
+  scale_color_manual(name = "Year", values =colorRampPalette(RColorBrewer::brewer.pal(11, "RdBu"))(15)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  #scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, 2)) +
+  ylab("SST Anomalies") +
+  theme(panel.grid.minor = element_blank())
+
+lizard_anoms
+
+```
+
+##### 6) 2024 bleaching event
+
+Combine bleaching alert status and DHW time-series for 2024 bleaching event 
+
+
+```{r, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
+
+library(ggpattern)
+
+# get climatology
+mmm_val <- terra::rast("data/GBR_ct5km_MMM_v3.1.nc") |> 
+  crop(lizard_shape) |> 
+  values() |> 
+  as.numeric()
+
+sst <- lizard_data %>%
+  ungroup() %>%
+  mutate(mmm_line = mmm_val,
+         dashed_line = mmm_val + 1,
+         bleachingwatch = case_when(
+           CRW_HOTSPOT_ <= 0 ~ "No Stress",
+           0 < CRW_HOTSPOT_ & CRW_HOTSPOT_ < 1 ~ "Watch",
+           CRW_HOTSPOT_ >= 1 & CRW_DHW_ > 0 & CRW_DHW_ < 4 ~ "Warning",
+           CRW_HOTSPOT_ >= 1 & CRW_DHW_ >= 4 & CRW_DHW_ < 8 ~ "Alert Level 1",
+           CRW_HOTSPOT_ >= 1 & CRW_DHW_ >= 8 & CRW_DHW_ < 12 ~ "Alert Level 2",
+           CRW_HOTSPOT_ >= 1 & CRW_DHW_ >= 12 & CRW_DHW_ < 16 ~ "Alert Level 3",
+           CRW_HOTSPOT_ >= 1 & CRW_DHW_ >= 16 & CRW_DHW_ < 20 ~ "Alert Level 4",
+           CRW_HOTSPOT_ >= 1 & CRW_DHW_ >= 20 ~ "Alert Level 5"
+         )) %>%
+  mutate(bleachingwatch = factor(bleachingwatch, levels=c("No Stress", "Watch", "Warning", "Alert Level 1", "Alert Level 2", "Alert Level 3", "Alert Level 4", "Alert Level 5"))) |> 
+ 
+   mutate(fill_area = ifelse(CRW_SST_ > dashed_line, CRW_SST_, dashed_line),
+         mmm_area = ifelse(CRW_SST_ < mmm_line, mmm_line, CRW_SST_)) %>%
+  
+  ggplot() + theme_bw() +
+  
+  geom_vline(xintercept = as.Date("2024-01-01 12:00:00"), color = "darkgrey", linewidth=0.5) +
+  
+  geom_linerange(aes(x = as.Date(time), ymin = 23.5, ymax = 24, color = bleachingwatch), linewidth = 2) +  # Set y-value and width for columns
+  
+  # geom_ribbon_pattern(aes(x = as.Date(time), ymin = mmm_val, ymax = mmm_area), na.rm = TRUE,
+  #                     pattern = "gradient",
+  #                     fill = "#00000000",
+  #                     pattern_fill = "darkgoldenrod2",
+  #                     pattern_fill2 = "darkgoldenrod2") +
+  # 
+  # geom_ribbon_pattern(aes(x = as.Date(time), ymin = dashed_line, ymax = fill_area), na.rm = TRUE,
+  #                     pattern = "gradient",
+  #                     fill = "#00000000",
+  #                     pattern_fill = "red",
+  #                     pattern_fill2 = "red") +
+  
+  geom_hline(yintercept = mmm_val, color = "darkred") +
+  geom_hline(yintercept = mmm_val + 1, linetype = "dashed") +
+  
+  geom_line(aes(x = as.Date(time), y = CRW_SST_, color = "SST"), color = "black", show.legend = FALSE, linewidth = 0.6) +  # Add CRW_SST_ 
+  
+  geom_rect(aes(xmin = as.Date("2023-11-01"), xmax = as.Date("2024-07-01"), ymin = 23.5, ymax = 24), fill = NA, color = "black", linewidth = 0.5) +
+  
+  geom_text(aes(as.Date("2024-01-09"), 31.8, label="2024"), size=4, color="darkgrey") +
+  geom_text(aes(as.Date("2023-12-24"), 31.8, label="2023"), size=4, color="darkgrey") +
+  geom_text(aes(as.Date("2023-11-09"), 28.8, label="MMM"), size=4, color="darkred") +
+  geom_text(aes(as.Date("2023-11-17"), 29.8, label="MMM + 1°C"), size=4, color="darkred") +
+  geom_text(aes(as.Date("2023-11-26"), 24.2, label="Bleaching alert status"), size=4, color="black") +
+  
+  scale_x_date(date_breaks = "1 month", date_labels = "%b", limits = as.Date(c("2023-11-01", "2024-07-01"))) +
+  scale_y_continuous(limits = c(23.5, 32), breaks=seq(24,32,2)) +
+  
+  labs(x = "\n Month", y = "Sea Surface Temperature (°C) [NOAA CRW SST]\n") +
+  theme(panel.grid.minor = element_blank(), 
+        legend.position = c(0.99, 0.99),  # Position legend at the top right
+        legend.justification = c("right", "top"),
+        legend.background = element_rect(fill = "white", color = NA),
+        legend.box.background = element_blank(),  # Remove border around legend
+        legend.title = element_blank()) +  # Optionally remove legend title
+    scale_color_manual(values = c("No Stress" = "#d2f8f9", "Watch" = "#fcf050", "Warning" = "#eead3e", 
+                                "Alert Level 1" = "#dc2f21", "Alert Level 2" = "#891a10", 
+                                "Alert Level 3" = "#6c1210", "Alert Level 4" = "#4a0d0d", 
+                                "Alert Level 5" = "#2a0707")) 
+
+sst
+
+```
+
+##### 6) Combined analysis
+
+Combine into a single plot using `patchwork`
+
+```{r, fig.width=8, fig.height=8, message=FALSE, warning=FALSE}
+
+library(patchwork)
+
+layout <- '
+AB
+CC
+'
+output <- wrap_plots(A = maxdhw, B = timeseries_dhw, C = sst, widths=c(1,1),  heights = c(4, 5), design = layout)
+
+output
+
+
+ggsave("outputs/layout.pdf", plot = output, width = 10, height = 8, device = "pdf")
+ggsave("outputs/layout.png", plot = output, width = 10, height = 8, dpi = 300, device = "png")
+
+```

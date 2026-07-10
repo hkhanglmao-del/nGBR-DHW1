@@ -1,0 +1,9 @@
+# Install a CUDA-enabled PyTorch build that matches your rented GPU image first:
+# https://pytorch.org/get-started/locally/
+#
+# Then install the common project dependencies:
+-r requirements.txt
+
+# Optional acceleration/monitoring packages.
+tensorboard>=2.16
+wandb>=0.17

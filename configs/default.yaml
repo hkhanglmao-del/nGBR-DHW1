@@ -1,0 +1,101 @@
+project:
+  name: DHWprj coral bleaching ML pipeline
+  seed: 42
+
+data:
+  crw_netcdf: data/dhw_5km_3231_0c35_4219_U1739212814032.nc
+  processed_dir: data/processed
+  external_dir: data/external
+  enso_csv:
+  spatial_mode: both
+  alert_scheme: noaa_extended
+
+targets:
+  regression: CRW_DHW
+  classification: alert_level
+  forecast_horizon_days: 28
+  sequence_length_days: 90
+
+features:
+  base:
+    - CRW_SST
+    - CRW_SSTANOMALY
+    - CRW_HOTSPOT
+    - CRW_DHW
+    - CRW_BAA
+    - CRW_BAA_7D_MAX
+  optional:
+    - chlorophyll_a
+    - par
+    - salinity
+    - current_u
+    - current_v
+    - current_speed
+    - enso_index
+  lags_days: [1, 3, 7, 14, 28, 56]
+  rolling_windows_days: [7, 14, 28, 56]
+  add_calendar: true
+
+split:
+  train_end: "2020-12-31"
+  val_end: "2022-12-31"
+
+training:
+  output_dir: artifacts
+  batch_size: 128
+  epochs: 80
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  patience: 12
+  min_delta: 0.0001
+  num_workers: 0
+  amp: true
+  gradient_clip: 1.0
+  regression_loss_weight: 1.0
+  classification_loss_weight: 0.35
+
+models:
+  enabled:
+    - random_forest
+    - xgboost
+    - lightgbm
+    - lstm
+    - gru
+    - cnn_lstm
+    - tft
+    - st_gnn
+  random_forest:
+    n_estimators: 600
+    max_depth:
+    min_samples_leaf: 2
+    n_jobs: -1
+  xgboost:
+    n_estimators: 1200
+    max_depth: 5
+    learning_rate: 0.03
+    subsample: 0.9
+    colsample_bytree: 0.9
+    tree_method: hist
+  lightgbm:
+    n_estimators: 1200
+    learning_rate: 0.03
+    num_leaves: 63
+    subsample: 0.9
+    colsample_bytree: 0.9
+  deep:
+    hidden_size: 96
+    num_layers: 2
+    dropout: 0.2
+    cnn_channels: 64
+    transformer_heads: 4
+    transformer_layers: 2
+    graph_hidden_size: 64
+
+eda:
+  output_dir: reports/eda
+  max_pairplot_rows: 5000
+
+evaluation:
+  output_dir: reports/evaluation
+  alert_positive_threshold: 3
+  save_predictions: true
