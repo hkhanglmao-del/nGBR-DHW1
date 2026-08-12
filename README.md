@@ -1,29 +1,27 @@
-DHWprj - Coral Bleaching Forecasting and Monitoring
+# DHWprj - Coral Bleaching Forecasting and Monitoring
+
 Project to build a pipeline for forecasting and monitoring coral bleaching risk around Lizard Island, Great Barrier Reef using NOAA Coral Reef Watch data and Machine Learning/Deep Learning models.
 
-1. Data status
+## 1. Data status
+
 Core data is ready in the repo:
 
-data/dhw_5km_3231_0c35_4219_U1739212814032.nc: NOAA CRW daily 5 km, period 2010-01-01 to 2025-02-08, includes SST, SST anomaly, HotSpot, DHW, Bleaching Alert Area.
-
-data/GBR_ct5km_MMM_v3.1.nc: climatology/MMM for GBR region.
-
-data/zipfolder/: shapefile Great Barrier Reef.
-
-data/processed/: preprocessed data from the latest pipeline run.
+- `data/dhw_5km_3231_0c35_4219_U1739212814032.nc`: NOAA CRW daily 5 km, period 2010-01-01 to 2025-02-08, includes SST, SST anomaly, HotSpot, DHW, Bleaching Alert Area.
+- `data/GBR_ct5km_MMM_v3.1.nc`: climatology/MMM for GBR region.
+- `data/zipfolder/`: shapefile Great Barrier Reef.
+- `data/processed/`: preprocessed data from the latest pipeline run.
 
 Extended data is not available in the repo and is set to optional mode:
 
-Chlorophyll-a and PAR from MODIS/NASA OceanColor.
+- Chlorophyll-a and PAR from MODIS/NASA OceanColor.
+- Salinity and ocean currents from Copernicus Marine/GLORYS.
+- ENSO index from NOAA CPC ONI or MEI.
 
-Salinity and ocean currents from Copernicus Marine/GLORYS.
+The current pipeline can still run with the available NOAA CRW dataset. When adding extended data, place the CSV files into `data/external/` and configure in `configs/default.yaml`.
 
-ENSO index from NOAA CPC ONI or MEI.
+## 2. Project structure
 
-The current pipeline can still run with the available NOAA CRW dataset. When adding extended data, place the CSV files into data/external/ and configure in configs/default.yaml.
-
-2. Project structure
-Plaintext
+```text
 configs/
   default.yaml              # Main config for data, feature, split, model, training
   data_sources.yaml         # Suggested extended data sources
@@ -48,144 +46,159 @@ artifacts/
 scripts/
   run_pipeline.py           # Secondary entry point
 tests/
-3. Environment setup
+```
+
+## 3. Environment setup
+
 Create virtual environment:
 
-Bash
+```bash
 python -m venv .venv
 .venv\Scripts\activate
+```
+
 Install basic packages:
 
-Bash
+```bash
 pip install -r requirements.txt
+```
+
 If training on a rented GPU, install the PyTorch CUDA matching the GPU image first, then:
 
-Bash
+```bash
 pip install -r requirements-gpu.txt
-4. Quick run for testing
+```
+
+## 4. Quick run for testing
+
 This command runs the entire pipeline with a small config for a smoke test:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli all --fast-dev-run --models random_forest,lstm,st_gnn
+```
+
 Results will be written to:
 
-data/processed/
+- `data/processed/`
+- `reports/eda/`
+- `reports/evaluation/`
+- `artifacts/models/`
 
-reports/eda/
+## 5. Run step by step
 
-reports/evaluation/
-
-artifacts/models/
-
-5. Run step by step
 Step 1 - Create preprocessed data:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli prepare
+```
+
 Step 2 - Visualize and analyze data:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli eda
+```
+
 Step 3 - Train and evaluate all models enabled in config:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli train
+```
+
 Step 4 - Run all prepare, EDA and train:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli all
-6. Choose model to train
+```
+
+## 6. Choose model to train
+
 Only train tabular baselines:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli train --models random_forest,xgboost,lightgbm
+```
+
 Only train deep learning:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli train --models lstm,gru,cnn_lstm,tft,st_gnn
+```
+
 Only train one model:
 
-Bash
+```bash
 python -m coral_bleaching_pipeline.cli train --models st_gnn
-If lightgbm or xgboost are not installed, the pipeline will notify and skip that model.
+```
 
-7. Important configurations
-Main config file: configs/default.yaml.
+If `lightgbm` or `xgboost` are not installed, the pipeline will notify and skip that model.
+
+## 7. Important configurations
+
+Main config file: `configs/default.yaml`.
 
 Some parameters to adjust when doing real training:
 
-targets.forecast_horizon_days: number of days to forecast ahead, default 28.
+- `targets.forecast_horizon_days`: number of days to forecast ahead, default 28.
+- `targets.sequence_length_days`: input sequence length for deep learning, default 90.
+- `split.train_end` and `split.val_end`: train/validation/test split points by target date.
+- `training.epochs`: number of epochs.
+- `training.patience`: early stopping patience.
+- `training.batch_size`: batch size.
+- `training.amp`: enable/disable mixed precision on GPU.
+- `models.enabled`: default model list.
 
-targets.sequence_length_days: input sequence length for deep learning, default 90.
+## 8. Adding MODIS, Copernicus, ENSO data
 
-split.train_end and split.val_end: train/validation/test split points by target date.
-
-training.epochs: number of epochs.
-
-training.patience: early stopping patience.
-
-training.batch_size: batch size.
-
-training.amp: enable/disable mixed precision on GPU.
-
-models.enabled: default model list.
-
-8. Adding MODIS, Copernicus, ENSO data
-Place CSV files into data/external/.
+Place CSV files into `data/external/`.
 
 If the variable applies generally to the entire region, the CSV only needs:
 
-Plaintext
+```text
 time,enso_index
 2020-01-01,0.5
 2020-01-02,0.5
+```
+
 If the variable is by individual node/grid point, the CSV needs:
 
-Plaintext
+```text
 time,node_id,chlorophyll_a,par,salinity,current_u,current_v
 2020-01-01,0,0.12,45.0,34.7,0.03,-0.02
 2020-01-01,1,0.11,44.5,34.8,0.02,-0.01
+```
+
 Optional variable names already recognized by the pipeline:
 
-chlorophyll_a
+- `chlorophyll_a`
+- `par`
+- `salinity`
+- `current_u`
+- `current_v`
+- `current_speed`
+- `enso_index`
 
-par
+## 9. Evaluation outputs
 
-salinity
-
-current_u
-
-current_v
-
-current_speed
-
-enso_index
-
-9. Evaluation outputs
 After training, check:
 
-reports/evaluation/leaderboard.csv: model comparison table.
-
-reports/evaluation/*_predictions.csv: individual model forecasts.
-
-reports/evaluation/*_confusion_matrix.csv: confusion matrix for alert level.
-
-reports/evaluation/*_classification_report.csv: classification report.
-
-reports/evaluation/training_curves/: train/validation loss.
+- `reports/evaluation/leaderboard.csv`: model comparison table.
+- `reports/evaluation/*_predictions.csv`: individual model forecasts.
+- `reports/evaluation/*_confusion_matrix.csv`: confusion matrix for alert level.
+- `reports/evaluation/*_classification_report.csv`: classification report.
+- `reports/evaluation/training_curves/`: train/validation loss.
 
 Main metrics:
 
-Regression: MAE, RMSE, R2 for DHW.
+- Regression: MAE, RMSE, R2 for DHW.
+- Classification: accuracy, balanced accuracy, macro F1, weighted F1 for alert level.
+- Event metrics: precision, recall, F1 for alert >= Alert Level 1.
 
-Classification: accuracy, balanced accuracy, macro F1, weighted F1 for alert level.
+## 10. Git notes
 
-Event metrics: precision, recall, F1 for alert >= Alert Level 1.
-
-10. Git notes
 This repo is configured to push to a new remote:
-git remote set-url origin https://github.com/coderkhongodo/DHWprj.git
-git config user.name coderkhongodo
-git config user.email coderkhongodo@users.noreply.github.com
-```
 
+```bash
+git remote add origin <your-github-repo-url>
+git branch -M main
+git push -u origin main
+```
